@@ -1,0 +1,492 @@
+---
+title: "PROYECTO FINANZAS CORPORATIVAS"
+author: "ANGEL MIRANDA"
+date: '2023-01-11'
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    latex_engine: xelatex
+---
+
+
+```{r,message=FALSE}
+library(class)
+library(AER)
+library(openxlsx)
+library(rpart)
+library(rpart.plot)
+library(ggplot2)
+library(glmnet)
+library(rmarkdown)
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+knitr::opts_chunk$set(error = TRUE)
+library(dplyr)
+library(DescTools)
+library(datawizard)
+library(weights)
+library(formattable)
+library(dplyr)
+library(corrplot)
+library(stargazer)
+library(broom)
+library(glmnet)
+```
+
+
+HOJAS DE EXCEL:
+
+DEFINIENDO NOMBRES DE COLUMNAS:
+ELIMINANDO FILAS Y COLUMNAS:
+DEFINIENDO DATA FRAMES:
+```{r, message=FALSE}
+#LEYENDO EL EXCEL:
+INFMUN<-read_excel("/Users/angel1/Desktop/Base_de_Datos_de_Inclusion_Financiera_202206.xlsm", sheet = "BD Infraestructura Edo")
+
+TENMUN<-read_excel("/Users/angel1/Desktop/Base_de_Datos_de_Inclusion_Financiera_202206.xlsm", sheet = "BD Tenencia Uso Banca Edo")
+
+GENMUN<-read_excel("/Users/angel1/Desktop/Base_de_Datos_de_Inclusion_Financiera_202206.xlsm", sheet = "BD Género Edo")
+
+#DATA FRAME, ELIMINAR COLUMNAS, DEFINIENDO NOMBRE DE COLUMNAS:
+
+TENMUN<-as.data.frame(TENMUN[-c(1:5),])
+
+colnames(TENMUN)<-c("Clave Estado", "Región", "Estado", "Numero de municipios", "Población", "Población Adulta", 
+             "Población Adulta Mujeres", "Población Adulta Hombres", "% Población adulta", 
+             "Cuentas transaccionales nivel 1", "Cuentas transaccionales nivel 2", "Cuentas transaccionales nivel 3", 
+             "Cuentas transaccionales tradicionales", "Cuentas de ahorro", "Depósitos a plazo", "Tarjetas de débito", 
+             "Tarjetas de crédito", "Hipotecario", "Grupal", "Personal", "Nómina", "Automotriz", "ABCD", "En TPV", 
+             "En cajeros automáticos", "Cuentas transaccionales nivel 1", "Cuentas transaccionales nivel 2", 
+             "Cuentas transaccionales nivel 3", "Cuentas transaccionales tradicionales", "Cuentas de ahorro", 
+             "Depósitos a plazo", "Tarjetas de débito", "Tarjetas de crédito", "Hipotecario", "Grupal", "Personal", 
+             "Nómina", "Automotriz", "ABCD", "En TPV", "En cajeros automáticos")
+
+
+INFMUN<-as.data.frame((INFMUN[-c(1,2), ]))
+colnames(INFMUN)<-c("Clave Estado", "Región", "Estado", "Número de municipios", "Población", "Población Adulta", 
+             "Población Adulta Mujeres", "Población Adulta Hombres", "% Población adulta", 
+             "Sucursales Banca comercial", "Sucursales Banca de desarrollo", "Sucursales Socap", "Sucursales Sofipo", 
+             "Total Sucursales", "Corresponsales", "Cajeros automáticos", "Terminales punto de venta", 
+             "Establecimientos con TPV", "Contratos que utilizan banca móvil", "Sucursales Banca comercial", 
+             "Sucursales Banca de desarrollo", "Sucursales Socap", "Sucursales Sofipo", "Total Sucursales", 
+             "Corresponsales", "Cajeros automáticos", "Terminales punto de venta", "Establecimientos con TPV", 
+             "Contratos que utilizan banca móvil")
+
+GENMUN<-as.data.frame((GENMUN[-c(1:5), ]))
+colnames(GENMUN)<-c("Clave Estado", "Región", "Estado", "Número de municipios", "Población", "Población Adulta", 
+             "Población Adulta Mujeres", "Población Adulta Hombres", "% Población adulta", "Mujeres", "Hombres", 
+             "Personas morales", "Total", "Mujeres", "Hombres", "Personas morales", "Total", "Mujeres", "Hombres", 
+             "Personas morales", "Total", "Mujeres", "Hombres", "Personas morales", "Total", "Mujeres", "Hombres", 
+             "Personas morales", "Total", "Mujeres", "Hombres", "Personas morales", "Total", "Mujeres", "Hombres", 
+             "Personas morales", "Total", "Mujeres", "Hombres", "Personas morales", "Total", "Mujeres", "Hombres", 
+             "Personas morales", "Total", "Mujeres", "Hombres", "Personas morales", "Total", "Mujeres", "Hombres", 
+             "Personas morales", "Total", "Mujeres", "Hombres", "Personas Morales", "Total", "Mujeres", "Hombres", 
+             "Personas Morales", "Total")
+```
+
+#DEFINIENDO LOS DATA FRAME DE CADA HOJA:
+
+##VARIABLES QUE USAREMOS:
+
+###Dependiente:
+OPCIÓN 1: #DE PERSONAS CON CUENTA DE AHORRO/TARJETA DE DEBITO
+%de personas incluidas en el sistema financiero (vamos a hacer esto dividiendo el #de tarjetas de debito entre la población adulta de cada Estado).
+
+OPCION 2: # DE PERSONAS CON ACCESO A CRÉDITO
+
+
+### Dependientes: 
+-INFRAESTRUCTURA
+  SUCURSAL BANCA COMERCIAL
+  SUCURSALES BANCA DE DESARROLLO
+  SUCURSALES SOFIPO (DEFINIR)
+  CAJEROS AUTOMATICOS
+  TPV
+  
+- TENDENCIA DE USO
+  tarjeta de debito
+  tarjeta de credito
+  (posible incluir mas tipos de crédito)
+  
+  
+- genero
+  cuentas de ahooro (mujeres)
+  cuentas de ahorro (hombres)
+  posible incluir numero de tarjetas de debito y credito por genero
+  
+
+
+```{r}
+#DATA FRAME VARIABLES INDEPENDIENTES:
+
+INFMUN2<-as.data.frame((INFMUN[ ,c(3,10,11,12,13,14,16,18)]))
+
+TENMUN2<-as.data.frame((TENMUN[,c(16,17)]))
+
+GENMUN2<-as.data.frame((GENMUN[ , c(10,11)]))
+
+```
+
+VARIABLE Y: VARIABLE ENDOGENA
+USARE TARJETAS DE DEBITO COMO RECOMENDÓ EL PROFESOR EN LUGAR DE LAS CUENTAS DE AHORRO
+
+CHECAR, POR QUE AL USAR Trjeta de debito / población no tiene sentido. 
+maybe sería mejor usar algun parámetro de credito mejor
+
+```{r}
+#14: VARIABLE ENDOGENA (CRÉDITO PERSONAL):
+
+ENDOGENA<-as.data.frame(( as.numeric( TENMUN$Personal))/as.numeric(TENMUN$`Población Adulta`))
+
+colnames(ENDOGENA)<-c("VARIABLE_ENDOGENA")
+
+```
+
+
+COMBINANDO LOS 2 DATA FRAMES Y AGREGANDO LA Y:
+
+```{r}
+
+VARIABLES<-cbind(ENDOGENA, INFMUN2,TENMUN2,GENMUN2)
+
+VARIABLES<-VARIABLES[,-5]
+
+
+```
+
+ELIMINANDO LOS NA´S:
+```{r}
+VARIABLES<-na.omit(VARIABLES)
+VARIABLES<-VARIABLES[-c(9,15,19,33,34),]
+```
+TRANSFORMANDO CARÁCTERES EN NÚMEROS:
+
+```{r}
+VARIABLES$`Sucursales Banca comercial`<-as.numeric(VARIABLES$`Sucursales Banca comercial`)
+
+VARIABLES$`Sucursales Banca de desarrollo` <- as.numeric(VARIABLES$`Sucursales Banca de desarrollo`)
+
+
+VARIABLES$`Establecimientos con TPV` <- as.numeric(VARIABLES$`Establecimientos con TPV`)
+
+
+VARIABLES$`Tarjetas de débito` <- as.numeric(VARIABLES$`Tarjetas de débito`)
+
+VARIABLES$`Tarjetas de crédito` <- as.numeric(VARIABLES$`Tarjetas de crédito`)
+
+VARIABLES$Mujeres <- as.numeric(VARIABLES$Mujeres)
+
+VARIABLES$Hombres <- as.numeric(VARIABLES$Hombres)
+
+VARIABLES$`Total Sucursales`<- as.numeric(VARIABLES$`Total Sucursales`)
+
+VARIABLES$`Sucursales Sofipo` <-as.numeric(VARIABLES$`Sucursales Sofipo`)
+
+VARIABLES$VARIABLE_ENDOGENA <- as.numeric(VARIABLES$VARIABLE_ENDOGENA)
+
+VARIABLES$`Cajeros automáticos` <- as.numeric(VARIABLES$`Cajeros automáticos`)
+
+VARIABLESEXOGENAS=VARIABLES[,-1:-2]
+
+```
+
+
+
+
+REGRESIONES:
+
+```{r}
+# Definiendo Variables
+Y <- VARIABLES$VARIABLE_ENDOGENA
+SBC <- VARIABLES$`Sucursales Banca comercial` 
+SBD <- VARIABLES$`Sucursales Banca de desarrollo` 
+SOF <- VARIABLES$`Sucursales Sofipo` 
+TS <- VARIABLES$`Total Sucursales` 
+CA <- VARIABLES$`Cajeros automáticos` 
+ET <- VARIABLES$`Establecimientos con TPV` 
+TD <- VARIABLES$`Tarjetas de débito`
+TC <- VARIABLES$`Tarjetas de crédito`
+MU <- VARIABLES$Mujeres 
+HO <- VARIABLES$Hombres 
+#APLICANDO LOGARITMOS:
+Yl <- log(VARIABLES$VARIABLE_ENDOGENA)
+SBCl <- log(VARIABLES$`Sucursales Banca comercial` + 0.0001)
+SBDl <- log(VARIABLES$`Sucursales Banca de desarrollo` + 0.0001)
+SOFl <- log(VARIABLES$`Sucursales Sofipo` + 0.0001)
+TSl <- log(VARIABLES$`Total Sucursales` + 0.0001)
+CAl <- log(VARIABLES$`Cajeros automáticos` + 0.0001)
+ETl <- log(VARIABLES$`Establecimientos con TPV` + 0.0001)
+TDl <- log(VARIABLES$`Tarjetas de débito`)
+TCl <- log(VARIABLES$`Tarjetas de crédito`)
+MUl <- log(VARIABLES$Mujeres + 0.0001)
+HOl <- log(VARIABLES$Hombres + 0.0001)
+
+
+
+
+lm.1=lm(Y ~ SBC + SBD + SOF + TS + CA + ET + TD + TC+MU+HO)
+lm.2=lm(Yl ~ SBCl + SBDl + SOFl + TSl + CAl + ETl + TDl + TCl+MUl+HOl)
+
+```
+
+```{r}
+#Verificacion de supuestos
+
+#1 Linealidad
+
+ggplot(VARIABLES, aes(x=log(`Sucursales Banca comercial`), y= VARIABLES$VARIABLE_ENDOGENA))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+
+ggplot(VARIABLES, aes(x=`Sucursales Banca de desarrollo`, y=`VARIABLE_ENDOGENA`))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+
+ggplot(VARIABLES, aes(x=`Sucursales Sofipo`, y=`VARIABLE_ENDOGENA`))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+
+ggplot(VARIABLES, aes(x=`Total Sucursales`, y=`VARIABLE_ENDOGENA`))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+
+ggplot(VARIABLES, aes(x=`Cajeros automáticos`, y=`VARIABLE_ENDOGENA`))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+
+ggplot(VARIABLES, aes(x=`Establecimientos con TPV`, y=`VARIABLE_ENDOGENA`))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+
+ggplot(VARIABLES, aes(x=VARIABLES$Mujeres, y=`VARIABLE_ENDOGENA`))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+
+ggplot(VARIABLES, aes(x=VARIABLES$Hombres, y=`VARIABLE_ENDOGENA`))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+
+ggplot(VARIABLES, aes(x=`Sucursales Banca de desarrollo`, y=`VARIABLE_ENDOGENA`))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+
+ggplot(VARIABLES, aes(x=`Sucursales Banca de desarrollo`, y=`VARIABLE_ENDOGENA`))+geom_point()+geom_smooth(method = "lm", formula = y ~ x, aes(group = 1), col = "red", se = F) 
+```
+```{r}
+#Homocedasticidad
+res=rstandard(lm.2)
+
+
+plot(fitted.values(lm.2),rstandard(lm.2), xlab="Valores ajustados", ylab="Residuos estandarizados")  
+abline(h=0)
+
+#Normalidad
+qqnorm(res) 
+qqline(res)  
+
+
+#Auto Correlacion
+acf(res)
+
+#Media Cero del Error
+mean(res)
+sd(res) 
+liminf <- mean(res)-qt(0.975, df=32-11)*sd(res)
+limsup <- mean(res)+qt(0.975, df=32-11)*sd(res)
+hist(res)
+c(liminf, limsup)
+
+#Multicolinealidad
+library("corrplot")
+corrplot(cor(VARIABLESEXOGENAS), method="number", number.cex = 0.8, tl.cex =0.5)
+library("olsrr")
+ols_vif_tol(lm.2)
+```
+
+
+pregunas:
+
+- % aceptable de correlación
+- como arreglar supuesto de residuos mean 0
+    - puede ser exactamente a 0 o puede ser muy cercano
+- Dispersión de los datos (GRAFICAS)
+-prueba de hipotesis
+- series de tiempo ()
+  - teorías como el ingreso y el empleo permanent
+e
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Creando la funcion  de coeficiente de variación:
+
+```{r}
+cv <- function(x) {
+  cv <- (sd(x) / mean(x))
+  return(cv)
+}
+
+```
+
+HACIENDO EL ANALISIS EXPLORATORIO:
+(SUMMARY)
+
+```{r}
+#mediana, promedio
+summary(VARIABLES)
+
+#VARIANZA
+sapply(VARIABLES,Var)
+
+#SD
+sapply(VARIABLES,sd)
+
+#COEFICIENTE DE VARIACIÓN:
+sapply(VARIABLES, cv)
+
+#MODA
+sapply(VARIABLES, mode)
+
+```
+
+
+MATRIZ:
+```{r}
+V3<-V3[,-7]
+V3 <- round(cor(V2),4)
+corrplot(V3, method="number", type= "upper")
+V3<-V3[-7,-7]
+view(V3)
+```
+
+
+regresión:
+
+```{r}
+V2<-VARIABLES[,-1]
+lm(VARIABLES$Total_Sucursales ~ VARIABLES$Cajeros_automaticos, data = VARIABLES)
+
+zz<-list(VARIABLES$Tipo_de_poblacion)
+table(zz)
+
+VARIABLES$Tipo_de_poblacion<- gsub("Urbano" ,"1" ,VARIABLES$Tipo_de_poblacion )
+VARIABLES$Tipo_de_poblacion<- gsub("Semi-metrópoli" ,"2" ,VARIABLES$Tipo_de_poblacion )
+VARIABLES$Tipo_de_poblacion<- gsub("En Transici<U+00F3>n" ,"3" ,VARIABLES$Tipo_de_poblacion )
+VARIABLES$Tipo_de_poblacion<- gsub("Metr<U+00F3>poli" ,"4" ,VARIABLES$Tipo_de_poblacion )
+VARIABLES$Tipo_de_poblacion<- gsub("Rural" ,"4" ,VARIABLES$Tipo_de_poblacion )
+VARIABLES$Tipo_de_poblacion<- gsub('Semi-urbano' ,"5" ,VARIABLES$Tipo_de_poblacion )
+
+write.xlsx(VARIABLES, "variables")
+
+system("open variables")
+
+unique(VARIABLES$Tipo_de_poblacion)
+```
+
+base regresión:
+
+```{r}
+regresion<-read.xlsx("/Users/angel1/Desktop/VARIABLESPARAREGRESIÓN.xlsx")
+```
+
+#TABLA BINARIA
+```{r}
+#rural
+regresion$Tipo_de_poblacion<-gsub("4","0",regresion$Tipo_de_poblacion )
+regresion$Tipo_de_poblacion<-gsub("3","0",regresion$Tipo_de_poblacion )
+
+#URBANO
+regresion$Tipo_de_poblacion<-gsub("2","1",regresion$Tipo_de_poblacion )
+regresion$Tipo_de_poblacion<-gsub("4","1",regresion$Tipo_de_poblacion )
+regresion$Tipo_de_poblacion<-gsub("5","1",regresion$Tipo_de_poblacion )
+
+
+
+
+```
+
+borrador 1: regresion1<-lm(regresion$Tipo_de_poblacion ~ regresion$Total_Sucursales + regresion$Cajeros_automaticos + regresion$Contratos_que_utilizan_banca_movil + regresion$Cuentas_de_ahorro + regresion$Cuentas_de_ahorro + regresion$Tarjetas_de_debito + regresion$Tarjetas_de_credito + regresion$Hipotecario + regresion$En_TPV, data = regresion)
+
+
+```{r}
+regresion1<-lm(regresion$Tarjetas_de_credito ~ regresion$Total_Sucursales + regresion$Cajeros_automaticos + regresion$Contratos_que_utilizan_banca_movil + regresion$Cuentas_de_ahorro + regresion$Tarjetas_de_debito + regresion$En_TPV, data = regresion)
+
+```
+
+```{r}
+plot(y=regresion$Total_Sucursales,x=regresion$Tipo_de_poblacion)
+```
+
+
+
+```{r}
+stargazer(regresion1,type = "text")
+```
+
+
+
+
+
+
+
+```{r}
+t <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
+Wt <- c(1.8, 8.5, 8.4, 4.5, 4.3, 6.9, 8, 5, 3.6, 2.6, 2.6, 4.2, 3.6, 3.7, 4.8, 4.3, 4.6)
+Ut <- c(1.4, 1.1, 1.5, 1.5, 1.2, 1, 1.1, 1.3, 1.8, 1.9, 1.5, 1.4, 1.8, 2.1, 1.5, 1.3, 1.4)
+
+
+model <- lm(Wt ~ I(1 / Ut))
+
+
+sqrt(sum(((1/Ut)-mean(1/Ut))^2))
+
+sum(1/Ut)
+sum(Wt)
+```
+
+
+
+```{r}
+#INFORMACIÓN MUNICIPAL:
+
+USOMUNICIAPL<-read_excel("/Users/angel1/Desktop/Base_de_Datos_de_Inclusion_Financiera_202206.xlsm", sheet = "BD Tenencia Uso Banca Mun")
+colnames(USOMUNICIAPL)<-c("Clave Estado", "Región", "Estado", "Numero de municipios", "Población", "Población Adulta", 
+             "Población Adulta Mujeres", "Población Adulta Hombres", "% Población adulta", 
+             "Cuentas transaccionales nivel 1", "Cuentas transaccionales nivel 2", "Cuentas transaccionales nivel 3", 
+             "Cuentas transaccionales tradicionales", "Cuentas de ahorro", "Depósitos a plazo", "Tarjetas de débito", 
+             "Tarjetas de crédito", "Hipotecario", "Grupal", "Personal", "Nómina", "Automotriz", "ABCD", "En TPV", 
+             "En cajeros automáticos", "Cuentas transaccionales nivel 1", "Cuentas transaccionales nivel 2", 
+             "Cuentas transaccionales nivel 3", "Cuentas transaccionales tradicionales", "Cuentas de ahorro", 
+             "Depósitos a plazo", "Tarjetas de débito", "Tarjetas de crédito", "Hipotecario", "Grupal", "Personal", 
+             "Nómina", "Automotriz", "ABCD", "En TPV", "En cajeros automáticos")
+
+USOMUNICIAPL<-as.data.frame((USOMUNICIAPL[-c(1,2), ]))
+
+USOMUNICIAPL<-na.omit(USOMUNICIAPL)
+
+USOMUNICIAPL2020<-read_excel("/Users/angel1/Desktop/INCLUSIONFIN2020.xlsm")
+colnames(USOMUNICIAPL2020)<-c("Clave Estado", "Región", "Estado", "Numero de municipios", "Población", "Población Adulta", 
+             "Población Adulta Mujeres", "Población Adulta Hombres", "% Población adulta", 
+             "Cuentas transaccionales nivel 1", "Cuentas transaccionales nivel 2", "Cuentas transaccionales nivel 3", 
+             "Cuentas transaccionales tradicionales", "Cuentas de ahorro", "Depósitos a plazo", "Tarjetas de débito", 
+             "Tarjetas de crédito", "Hipotecario", "Grupal", "Personal", "Nómina", "Automotriz", "ABCD", "En TPV", 
+             "En cajeros automáticos", "Cuentas transaccionales nivel 1", "Cuentas transaccionales nivel 2", 
+             "Cuentas transaccionales nivel 3", "Cuentas transaccionales tradicionales", "Cuentas de ahorro", 
+             "Depósitos a plazo", "Tarjetas de débito", "Tarjetas de crédito", "Hipotecario", "Grupal", "Personal", 
+             "Nómina", "Automotriz", "ABCD", "En TPV", "En cajeros automáticos")
+USOMUNICIAPL2020<-as.data.frame((USOMUNICIAPL2020[-c(1,2), ]))
+USOMUNICIAPL2020<-na.omit(USOMUNICIAPL2020)
+
+
+```
+```{r}
+(USOMUNICIAPL)
+```
+
+
+
+
+
+
+
+
+
